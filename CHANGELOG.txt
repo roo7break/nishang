@@ -1,5 +1,169 @@
+0.8.9
+- Added Add-ConstrainedDelegationBackdoor to the ActiveDirectory directory.
+0.8.2
+- Restored PowerShell only payloads dependency for Out-SCT
+- Out-Excel and Out-Word handle payloads a bit more intelligently now. 
+- Invoke-BruteForce can now detect SQL Server 2017 on success.
+0.8.1
+- Removed PowerShell only payloads dependency from Out-SCT
+0.8.0
+- Removed PowerShell only payloads dependency from Invoke-JSRatRegsvr and Invoke-JSRatRundll
+0.7.7
+- Removed Get-Unconstrained from the ActiveDirectory directory.
+- Added Set-DCShadowPermissions to the ActiveDirectory directory.
+0.7.6
+- Added Set-RemotePSRemoting to the Backdoors directory.
+- Added DDE techqniue to Out-Excel.
+0.7.5
+- Added Set-RemoteWMI.ps1 to Backdoors directory.
+- Added download-exec persistence to Add-Persistence.
+- Bug fixes in Add-Persistence
+- Invoke-SessionGopher no longer needs password as a parameter.
+- Minor changes in help section of Invoke-PowerShellWMI
+- Modified Invoke-PowerShellWMI to allow execution of commands and scripts non-interactively.
+- Bug fixes in Out-Word.
+- Added a bit of DDE payload hiding in Out-Word.
+- Added DDE payloads to Out-Word.
+0.7.4
+- Added Invoke-SessionGopher.ps1 by Brandon Arvanaghi with some usability modifications to the Gather directory. 
+0.7.3
+- Updated mimikatz dll in Invoke-Mimikatz.ps1 to 2.1.1
+- Updated Invoke-AmsiBypass to add another AMSI bypass by Matt Graeber. 
+- Bug fixes in Copy-VSS and Out-SCT. 
+- Minor improvements to Out-ShortCut. 
+ 
+0.7.2
+- Added Invoke-PowershellTcpOnelineBind to the Shells directory. 
+0.7.1
+- Added Invoke-AmsiBypass to the Bypass directory.
+0.7.0
+- Added Invoke-SSIDExfil to the Gather directory. 
+- Gupt-Backdoor can now receive commands from SSID names on targets having PowerShellv3 and above.
+ - Added ConverTo-ROT13 to the Utility directory.
+0.6.9
+- Get-PassHashes now uses Reflection. Thanks to Zer1t0 on GitHub.
+- Added Invoke-Mimikittenz by Jamieson O'Reilly
+0.6.8
+- Added Out-SCF in the Client directory.
+0.6.7
+- Added Out-JS.ps1 in the Client directory.
+- Added Out-SCT.ps1 in the Client directory.
+- Added Invoke-JSRatRegsvr.ps1 in the Shells directory.
+- Added Out-RundllCommand in the Execution directory.
+0.6.6
+- Added Invoke-JSRatRundll in the Shells directory.
+0.6.5
+- Updated Out-Word, Out-Excel, Out-HTA and Out-CHM. Now, scripts can directly be used as a payload.
+- Updated Out-Word and Out-Excel. If a new document is now generated it tries to trick the target in enabling macros.
+- Out-HTA uses inline VBScript now. A separate VBScirpt is not generated anymore.
+0.6.4
+- Added ActiveDirecotry directory.
+- Added Get-UnConstrained.ps1 to the ActiveDirectory directory.
+- Added Invoke-Mimikatz (mimikatz version 2.1 alpha 17/02//2016) to the Gather Directory.
+0.6.3
+- Added Invoke-Interceptor to the MITM directory.
+0.6.2
+- Added support for dumping cleartext credentials from RDP sessions for Invoke-MimikatzWfigestDowngrade.
+0.6.1
+- Added Show-TargetScreen to the Gather directory.
+0.6.0
+- Added Invoke-PsUACme to the Escalation directory.
+0.5.9
+- Added Get-PassHints to the Gather directory.
+- Added Out-WebQuery and Get-PassHints to Powerpreter.
+0.5.8
+- Added Out-WebQuery to the Client directory.
+- Added Start-CaptureServer to the Utility directory.
+0.5.7
+- Invoke-PoshRatHttps does not install root certificate anymore and certificate pinning is used.
+- Added a disclaimer.
+- Minor bugs in Powerpreter are fixed.
+- Updates to Antak. Authentication and ability to execute SQL Queries added.
+- Name of Do-Exfiltration changed in HTTP-Backdoor, DNS_TXT_Pwnage and Execute-On-Time
+- Removed hard coded credentials from Invoke-PSGcat.ps1 and Invoke-PSGcat in Powerpreter. So embarrassing!
+0.5.6
+- Added Invoke-PowerShellIcmp to the Shells directory.
+- Adjusted buffer for Invoke-PowerarShellTcp and Invoke-PowerShellUdp and one liners to show larger output.
+0.5.5
+- Added Invoke-PowerShellWmi to the Shells directory. 
+0.5.4
+- Added Invoke-PoshRatHttps, Invoke-PosRatHttp and Remove-PoshRat to the Shells directory.
+0.5.3
+- Added Invoke-PowerShellUdp and Invoke-PowerShellUdpOneLiner to Shells directory.
+0.5.2
+- Added Invoke-PowerShellTcp and Invoke-PowerShellTcpOneLiner to Shells directory.
+0.5.1
+- Added Invoke-MimikatzWfigestDowngrade to Gather directory.
+0.5.0.1
+- Updated Powerpreter by adding Invoke_NetworkRelay and Gcat.
+0.5.0
+- Added Invoke-NetworkRelay to Pivot directory.
+- Added Invoke-PsGcat and Invoke-PsGcatAgent to Shells directory.
+0.4.4.2
+- Brute-Force.ps1 renamed to Invoke-BruteForce.
+- Brute-Force function renamed to Invoke-BruteForce in Powerpreter.
+- Major changes to Invoke-BruteForce.
+- Major changes to B
+0.4.4.1
+- Credentials script renamed to Invoke-CredentialsPhish.
+- Bug fixes related to exfiltration in the Keylogger script.
+- Execute-Command-MSSQL now supports Windows Authentication.
+0.4.4
+- Added Add-ScrnSaverBackdoor to the Backdoors directory.
+- Download-Execute-PS now randomizes filename for the saved script.
+- Added Invoke-ADSBackdoor (by Matt).
+0.4.3
+- Added Out-DnsTxt to Utility directory.
+- Modifications to DNS_TXT_Pwnage and Execute-DNSTXT-Code to support multiple domains.
+- Added Out-DnsTxt to Powerpreter.
+- Updates to Powerpreter fucntions DNS_TXT_Pwnage and Execute-DNSTXT-Code.
+0.4.2
+- Powerpreter updated to include Client Side Attack functions and other bug fixes.
+0.4.1
+- Bug fixes to Out-Word and Out-Excel.
+0.4.0
+- Added scripts for Client Side Attacks
+0.3.8.1
+- Changes to Encoding and Compression methods acroos multiple scripts
+- Bug fix in Get-LSASecrets.ps1
+0.3.8
+- Fixed help in all the scripts. Now, help is available for the loaded functions.
+0.3.7
+- Added Gupt-Backdoor to Backdoors.
+0.3.6.6
+- Changes to Download_Execute to make it work with authentication proxies.
+0.3.6.5
+- Minor changes to ExeToText.
+0.3.6.4
+- Get-PassHashes does not require SYSTEM privs anymore.
+0.3.6.3
+- Minor changes to Download-Execute-PS which now allows to pass arguments to scripts.
+0.3.6.2
+- Invoke-Encode can now output encoded command which could be used to execute scripts in a non-interactive shell.
+0.3.6.1
+- Powerpreter code made more readable.
+- Powerpreter updated for recent changes done to other scripts in Nishang (Egress Testing, New Exfil methods, Bug fixes).
+- Powerpreter persistence improved and bugs fixed.
+- Bug fixes in HTTP-Backdoor and Execute_OnTime.
+- Minor improvements to TextToExe and ExeToText scripts in Utility.
+0.3.6
+- Added Invoke-Encode.
+- Changed compression and encoding methods used by Do-Exfitration, Backdoors, Invoke-Decode, Add-Exfiltration and Keylogger.
+0.3.5
+- Added Antak Webshell.
 0.3.4
 - Minor improvements in StringtoBase64.ps1
+- Fixed a typo in Firelistener. Client port was not being displayed.
+- All the scripts could be run using "dot source" now.
+- All the scripts in Nishang could be loaded into current powershell session by importing Nishang.psm1 module.
+- Added new exfiltration options, POST requests to Webserver and DNS txt queries.
+- Removed exfiltration support for tinypaste.
+- Exfiltration options have been removed from all scripts but Backdoors and Keylogger.
+- Added Nishang.psm1
+- Added Do-Exfiltration.ps1.
+- Added Add-Exfiltration.ps1.
+- Added Invoke-Decode.ps1.
+- Removed Browse_Accept_Applet.ps1
 0.3.3
 - Minor bug fix in Copy-VSS.ps1
 - Bug fix in Keylogger.ps1. It should log keys from a remote shell now (not powershell remoting).

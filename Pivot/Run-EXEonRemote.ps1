@@ -1,4 +1,7 @@
-﻿
+
+function Run-EXEonRemote
+{
+
 <#
 .SYNOPSIS
 Nishang script which can drop and execute executables on multiple computers.
@@ -27,18 +30,17 @@ around the argument is necessary.
 
 .LINK
 http://labofapenetrationtester.blogspot.com/2013/04/poshing-the-hashes.html
-http://code.google.com/p/nishang
+https://github.com/samratashok/nishang
 #>
+    [CmdletBinding()] Param(
+        [Parameter(Position = 0)]
+        [String]
+        $ExeArgs,
 
+        [Switch]
+        $VerboseErrors
+    )
 
-
-
-Param ([Switch] $VerboseErrors,
-[Parameter(Position = 0)] [String] $ExeArgs)
-
-function Run-EXEonRemote
-{
-    
     $ErrorActionPreference = "SilentlyContinue"
     if ($VerboseErrors)
     {
@@ -67,4 +69,5 @@ function Run-EXEonRemote
     Remove-Item $EXE
 }
 
-Run-EXEonRemote
+
+

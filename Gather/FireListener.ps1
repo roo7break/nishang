@@ -1,26 +1,30 @@
-﻿<#
+function FireListener
+{
+<#
 .SYNOPSIS
 This script is part of Nishang. FireListener is a PowerShell script that does egress testing. It is to be run on the attacking/listening machine.
 
 .DESCRIPTION
-FireListener hosts a listening server to which FireBuster can send packets to. Firebister is to be run on the target machine which is to 
+FireListener hosts a listening server to which FireBuster can send packets to. Firebuster is to be run on the target machine which is to 
 be tested for egress filtering.
 
 .EXAMPLE
-.\FireListener.ps1 -portrange 1000-1020
+PS > FireListener -portrange 1000-1020
 
 .LINK
-http://labofapenetrationtester.blogspot.com/
-http://code.google.com/p/nishang
+http://www.labofapenetrationtester.com/2014/04/egress-testing-using-powershell.html
+https://github.com/samratashok/nishang
 http://roo7break.co.uk
 
 .NOTES
 Based on the script written by Nikhil ShreeKumar (@roo7break)
 #>
-Param( [Parameter(Position = 0, Mandatory = $True)] [String] $portrange)
-
-function FireListener
-{
+    Param( 
+        [Parameter(Position = 0, Mandatory = $True)]
+        [String]
+        $PortRange
+    )
+    
     $ErrorActionPreference = 'SilentlyContinue'
     #Code which opens a socket for each port
     $socketblock = { 
@@ -34,7 +38,7 @@ function FireListener
 			$RecData = $ListenSocket.AcceptTCPClient()
 			$clientip = $RecData.Client.RemoteEndPoint.Address.ToString()
             $clientport = $RecData.Client.LocalEndPoint.Port.ToString()
-			Write-Host "$clientip connected through port $clientpor" -ForegroundColor Green
+			Write-Host "$clientip connected through port $clientport" -ForegroundColor Green
 		    $Stream.Close()
 			$ListenSocket.Stop()		
 			} catch
@@ -88,4 +92,4 @@ function FireListener
 }
 
 
-FireListener
+

